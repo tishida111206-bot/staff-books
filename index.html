@@ -1,0 +1,785 @@
+﻿<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StaffBook</title>
+<style>
+  :root { --ink:#241b14; --sub:#725f4e; --paper:#fbf4e8; --line:#ded0bd; --green:#1f6460; --gold:#c59755; --dark:#2b211b; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; color:var(--ink); font-family:system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:#eadcc8; }
+  .screen { min-height:100vh; }
+  .intro { position:fixed; inset:0; z-index:20; display:grid; place-items:center; background:#130d09; overflow:hidden; transition:opacity .38s ease, visibility .38s ease; }
+  .intro.done { opacity:0; visibility:hidden; pointer-events:none; }
+  .introVideo { width:100%; height:100%; object-fit:cover; background:#130d09; }
+  .skipIntro { position:absolute; right:16px; bottom:16px; min-height:42px; border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:0 14px; background:rgba(31,22,16,.42); color:white; font-weight:700; cursor:pointer; }
+  @media (prefers-reduced-motion: reduce) { .intro { display:none; } }
+  .home { display:flex; flex-direction:column; }
+  .homeHead { position:sticky; top:0; z-index:2; background:rgba(251,244,232,.96); border-bottom:1px solid var(--line); padding:20px clamp(16px, 4vw, 42px) 16px; display:grid; gap:14px; backdrop-filter:blur(8px); }
+  .titleRow { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; }
+  h1 { margin:0; font-family:Georgia, "Times New Roman", serif; font-size:clamp(32px, 6vw, 58px); line-height:1; letter-spacing:0; }
+  .count { color:var(--sub); font-size:14px; white-space:nowrap; }
+  .controls { display:grid; gap:10px; }
+  input { width:100%; border:1px solid var(--line); border-radius:10px; padding:15px 15px; font-size:17px; background:white; }
+  .groups { display:flex; gap:8px; overflow:auto; padding-bottom:2px; }
+  .chip { flex:0 0 auto; border:1px solid var(--line); background:#fff7ec; color:var(--ink); border-radius:999px; padding:11px 14px; font-size:14px; cursor:pointer; min-height:42px; }
+  .chip.active { background:var(--green); border-color:var(--green); color:white; }
+  .nameGrid { padding:24px clamp(14px, 4vw, 42px) 46px; display:grid; grid-template-columns:repeat(auto-fill, minmax(178px, 1fr)); gap:16px; align-content:start; }
+  .nameButton { position:relative; min-height:76px; border:1px solid #9b7045; border-radius:8px; background:linear-gradient(145deg, #fff8df 0%, #ead1a6 100%); color:#2c1c12; font-family:Georgia, "Times New Roman", serif; font-size:20px; font-weight:700; letter-spacing:0; cursor:pointer; box-shadow:0 5px 0 #7b4d2d, 0 12px 20px rgba(52,34,20,.16), inset 0 1px 0 rgba(255,255,255,.82), inset 0 -10px 20px rgba(112,68,31,.08); text-shadow:0 1px 0 rgba(255,255,255,.65); transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease, filter .14s ease; touch-action:manipulation; overflow:hidden; }
+  .nameButton::before { content:""; position:absolute; inset:7px; border:1px solid rgba(119,72,34,.36); border-radius:6px; pointer-events:none; }
+  .nameButton::after { content:""; position:absolute; width:8px; height:8px; left:12px; top:12px; border-radius:999px; background:rgba(124,75,36,.34); box-shadow:calc(100% + 132px) 0 0 rgba(124,75,36,.26), 0 40px 0 rgba(124,75,36,.22), calc(100% + 132px) 40px 0 rgba(124,75,36,.18); pointer-events:none; opacity:.5; }
+  .nameButton:hover { border-color:#7d4e2e; filter:saturate(1.05); transform:translateY(-3px) rotate(-.2deg); box-shadow:0 8px 0 #704528, 0 18px 28px rgba(52,34,20,.22), inset 0 1px 0 rgba(255,255,255,.9), inset 0 -10px 20px rgba(112,68,31,.08); }
+  .nameButton:active { transform:translateY(4px) scale(.985); box-shadow:0 1px 0 #704528, 0 5px 10px rgba(52,34,20,.16), inset 0 2px 8px rgba(82,44,20,.18); }
+  .nameButton:focus-visible { outline:3px solid rgba(31,100,96,.34); outline-offset:3px; }
+  .empty { padding:24px; color:var(--sub); }
+  .profile { display:none; min-height:100vh; background:#2b241f; color:white; overflow:hidden; }
+  .profile.active { display:flex; flex-direction:column; }
+  .profile.entering { animation:profileBackdrop .38s ease both; }
+  .profileBar { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px clamp(12px, 3vw, 28px); background:#211812; border-bottom:1px solid rgba(255,255,255,.12); }
+  .profile.entering .profileBar { animation:barDrop .34s ease both; }
+  .back { border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.12); color:white; border-radius:8px; min-height:42px; padding:0 14px; font-size:15px; font-weight:750; cursor:pointer; }
+  .selected { min-width:0; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; justify-content:flex-end; text-align:right; }
+  .selected strong { font-size:22px; }
+  .selected span { color:#d8c7b2; font-size:13px; }
+  .imageWrap { flex:1; display:grid; place-items:center; padding:clamp(8px, 2vw, 22px); overflow:auto; position:relative; }
+  .imageWrap::before { content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 50%, rgba(255,238,193,.26), transparent 34%); opacity:0; pointer-events:none; }
+  .profile.entering .imageWrap::before { animation:impactFlash .46s ease both; }
+  .profileImage { max-width:100%; max-height:calc(100vh - 92px); width:auto; height:auto; object-fit:contain; box-shadow:0 18px 60px rgba(0,0,0,.35); background:#eee; transform-origin:center; }
+  .profile.entering .profileImage { animation:profileBang .46s cubic-bezier(.16,1.08,.28,1) both; }
+  @keyframes profileBackdrop { from { background:#140d09; } to { background:#2b241f; } }
+  @keyframes barDrop { from { opacity:0; transform:translateY(-18px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes impactFlash { 0% { opacity:0; transform:scale(.72); } 24% { opacity:1; transform:scale(1); } 100% { opacity:0; transform:scale(1.55); } }
+  @keyframes profileBang { 0% { opacity:0; transform:scale(.72) rotate(-1.4deg); filter:brightness(1.18); } 55% { opacity:1; transform:scale(1.045) rotate(.45deg); filter:brightness(1.04); } 78% { transform:scale(.985) rotate(-.18deg); } 100% { opacity:1; transform:scale(1) rotate(0); filter:brightness(1); } }
+  @media (max-width:560px) { .homeHead { padding:16px 14px 12px; } .groups { gap:7px; } .chip { padding:10px 13px; min-height:40px; } .nameGrid { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; padding:16px 12px 30px; } .nameButton { font-size:18px; min-height:72px; padding:8px 10px; } .nameButton::after { box-shadow:calc(100% + 104px) 0 0 rgba(124,75,36,.22), 0 36px 0 rgba(124,75,36,.18), calc(100% + 104px) 36px 0 rgba(124,75,36,.14); } .profileBar { align-items:flex-start; flex-direction:column; } .selected { text-align:left; justify-content:flex-start; } .profileImage { max-height:none; } }
+</style>
+</head>
+<body>
+<div class="intro" id="intro" aria-label="StaffBook opening">
+  <video class="introVideo" id="introVideo" src="staffbook-opening.mp4" autoplay muted playsinline preload="auto"></video>
+  <button class="skipIntro" id="skipIntro" type="button">Skip</button>
+</div>
+<section class="screen home" id="home">
+  <header class="homeHead">
+    <div class="titleRow"><h1>StaffBook</h1><div class="count" id="count"></div></div>
+    <div class="controls">
+      <input id="filter" type="search" placeholder="名前で絞り込み" autocomplete="off">
+      <div class="groups" id="groups"></div>
+    </div>
+  </header>
+  <main class="nameGrid" id="names"></main>
+</section>
+<section class="screen profile" id="profile">
+  <div class="profileBar">
+    <button class="back" id="back" type="button">一覧に戻る</button>
+    <div class="selected"><strong id="selectedName"></strong><span id="selectedGroup"></span></div>
+  </div>
+  <div class="imageWrap"><img class="profileImage" id="profileImage" alt=""></div>
+</section>
+<script>
+const introEl = document.getElementById('intro');
+const introVideoEl = document.getElementById('introVideo');
+const skipIntroEl = document.getElementById('skipIntro');
+function closeIntro() { if (introEl) introEl.classList.add('done'); }
+if (skipIntroEl) skipIntroEl.addEventListener('click', closeIntro);
+if (introVideoEl) {
+  introVideoEl.addEventListener('ended', closeIntro);
+  introVideoEl.addEventListener('error', closeIntro);
+  window.addEventListener('load', () => {
+    const playPromise = introVideoEl.play();
+    if (playPromise && typeof playPromise.catch === 'function') playPromise.catch(() => setTimeout(closeIntro, 1800));
+    setTimeout(closeIntro, 7000);
+  });
+}
+const members = [
+  {
+    "page": 4,
+    "name": "美和勇輝",
+    "group": "役員",
+    "image": "profile-pages/page-004.jpg"
+  },
+  {
+    "page": 5,
+    "name": "岩田嵩生",
+    "group": "役員",
+    "image": "profile-pages/page-005.jpg"
+  },
+  {
+    "page": 6,
+    "name": "青木藍花",
+    "group": "役員",
+    "image": "profile-pages/page-006.jpg"
+  },
+  {
+    "page": 7,
+    "name": "岩崎丈一郎",
+    "group": "役員",
+    "image": "profile-pages/page-007.jpg"
+  },
+  {
+    "page": 9,
+    "name": "菊池あん",
+    "group": "開発局",
+    "image": "profile-pages/page-009.jpg"
+  },
+  {
+    "page": 10,
+    "name": "佐藤凛",
+    "group": "開発局",
+    "image": "profile-pages/page-010.jpg"
+  },
+  {
+    "page": 11,
+    "name": "宇田津蓮",
+    "group": "開発局",
+    "image": "profile-pages/page-011.jpg"
+  },
+  {
+    "page": 12,
+    "name": "金子休太郎",
+    "group": "開発局",
+    "image": "profile-pages/page-012.jpg"
+  },
+  {
+    "page": 13,
+    "name": "橋本真旺",
+    "group": "開発局",
+    "image": "profile-pages/page-013.jpg"
+  },
+  {
+    "page": 14,
+    "name": "角田麗衣",
+    "group": "開発局",
+    "image": "profile-pages/page-014.jpg"
+  },
+  {
+    "page": 15,
+    "name": "高野諭",
+    "group": "開発局",
+    "image": "profile-pages/page-015.jpg"
+  },
+  {
+    "page": 16,
+    "name": "池田睦",
+    "group": "開発局",
+    "image": "profile-pages/page-016.jpg"
+  },
+  {
+    "page": 17,
+    "name": "西川和華",
+    "group": "開発局",
+    "image": "profile-pages/page-017.jpg"
+  },
+  {
+    "page": 18,
+    "name": "井上裕太朗",
+    "group": "開発局",
+    "image": "profile-pages/page-018.jpg"
+  },
+  {
+    "page": 19,
+    "name": "岸遥杜",
+    "group": "開発局",
+    "image": "profile-pages/page-019.jpg"
+  },
+  {
+    "page": 20,
+    "name": "吉田壮志朗",
+    "group": "開発局",
+    "image": "profile-pages/page-020.jpg"
+  },
+  {
+    "page": 21,
+    "name": "岩佐大智",
+    "group": "開発局",
+    "image": "profile-pages/page-021.jpg"
+  },
+  {
+    "page": 22,
+    "name": "田辺すみれ",
+    "group": "開発局",
+    "image": "profile-pages/page-022.jpg"
+  },
+  {
+    "page": 23,
+    "name": "鴨志田佳大",
+    "group": "開発局",
+    "image": "profile-pages/page-023.jpg"
+  },
+  {
+    "page": 24,
+    "name": "岩崎実怜",
+    "group": "開発局",
+    "image": "profile-pages/page-024.jpg"
+  },
+  {
+    "page": 25,
+    "name": "伊賀優也",
+    "group": "開発局",
+    "image": "profile-pages/page-025.jpg"
+  },
+  {
+    "page": 26,
+    "name": "作田澪",
+    "group": "開発局",
+    "image": "profile-pages/page-026.jpg"
+  },
+  {
+    "page": 28,
+    "name": "江口万理",
+    "group": "運営統括局",
+    "image": "profile-pages/page-028.jpg"
+  },
+  {
+    "page": 29,
+    "name": "平敷亮晴",
+    "group": "運営統括局",
+    "image": "profile-pages/page-029.jpg"
+  },
+  {
+    "page": 30,
+    "name": "竹内あいり",
+    "group": "運営統括局",
+    "image": "profile-pages/page-030.jpg"
+  },
+  {
+    "page": 31,
+    "name": "西端結子",
+    "group": "運営統括局",
+    "image": "profile-pages/page-031.jpg"
+  },
+  {
+    "page": 32,
+    "name": "小田啓太",
+    "group": "運営統括局",
+    "image": "profile-pages/page-032.jpg"
+  },
+  {
+    "page": 33,
+    "name": "松井春奈",
+    "group": "運営統括局",
+    "image": "profile-pages/page-033.jpg"
+  },
+  {
+    "page": 34,
+    "name": "村田愛奈",
+    "group": "運営統括局",
+    "image": "profile-pages/page-034.jpg"
+  },
+  {
+    "page": 35,
+    "name": "今城駿介",
+    "group": "運営統括局",
+    "image": "profile-pages/page-035.jpg"
+  },
+  {
+    "page": 36,
+    "name": "乾亮太",
+    "group": "運営統括局",
+    "image": "profile-pages/page-036.jpg"
+  },
+  {
+    "page": 37,
+    "name": "高田直也",
+    "group": "運営統括局",
+    "image": "profile-pages/page-037.jpg"
+  },
+  {
+    "page": 38,
+    "name": "兒玉直斗",
+    "group": "運営統括局",
+    "image": "profile-pages/page-038.jpg"
+  },
+  {
+    "page": 39,
+    "name": "小野尊凱",
+    "group": "運営統括局",
+    "image": "profile-pages/page-039.jpg"
+  },
+  {
+    "page": 40,
+    "name": "山田成希",
+    "group": "運営統括局",
+    "image": "profile-pages/page-040.jpg"
+  },
+  {
+    "page": 41,
+    "name": "深谷翔希空",
+    "group": "運営統括局",
+    "image": "profile-pages/page-041.jpg"
+  },
+  {
+    "page": 42,
+    "name": "倉本茉莉香",
+    "group": "運営統括局",
+    "image": "profile-pages/page-042.jpg"
+  },
+  {
+    "page": 43,
+    "name": "吉留乙華",
+    "group": "運営統括局",
+    "image": "profile-pages/page-043.jpg"
+  },
+  {
+    "page": 44,
+    "name": "佐藤舞理名",
+    "group": "運営統括局",
+    "image": "profile-pages/page-044.jpg"
+  },
+  {
+    "page": 45,
+    "name": "福山莉子",
+    "group": "運営統括局",
+    "image": "profile-pages/page-045.jpg"
+  },
+  {
+    "page": 46,
+    "name": "里見莉那",
+    "group": "運営統括局",
+    "image": "profile-pages/page-046.jpg"
+  },
+  {
+    "page": 47,
+    "name": "石田貴久",
+    "group": "運営統括局",
+    "image": "profile-pages/page-047.jpg"
+  },
+  {
+    "page": 48,
+    "name": "三友さら",
+    "group": "運営統括局",
+    "image": "profile-pages/page-048.jpg"
+  },
+  {
+    "page": 49,
+    "name": "森ヒロキ",
+    "group": "運営統括局",
+    "image": "profile-pages/page-049.jpg"
+  },
+  {
+    "page": 50,
+    "name": "久保田花怜",
+    "group": "運営統括局",
+    "image": "profile-pages/page-050.jpg"
+  },
+  {
+    "page": 51,
+    "name": "高橋菜緒",
+    "group": "運営統括局",
+    "image": "profile-pages/page-051.jpg"
+  },
+  {
+    "page": 52,
+    "name": "東玲佳",
+    "group": "運営統括局",
+    "image": "profile-pages/page-052.jpg"
+  },
+  {
+    "page": 53,
+    "name": "横内唯乃",
+    "group": "運営統括局",
+    "image": "profile-pages/page-053.jpg"
+  },
+  {
+    "page": 54,
+    "name": "村田大志",
+    "group": "運営統括局",
+    "image": "profile-pages/page-054.jpg"
+  },
+  {
+    "page": 55,
+    "name": "石毛祐貴",
+    "group": "運営統括局",
+    "image": "profile-pages/page-055.jpg"
+  },
+  {
+    "page": 57,
+    "name": "堀田悠斗",
+    "group": "渉外局",
+    "image": "profile-pages/page-057.jpg"
+  },
+  {
+    "page": 58,
+    "name": "田中優衣",
+    "group": "渉外局",
+    "image": "profile-pages/page-058.jpg"
+  },
+  {
+    "page": 59,
+    "name": "古川結理",
+    "group": "渉外局",
+    "image": "profile-pages/page-059.jpg"
+  },
+  {
+    "page": 60,
+    "name": "遠藤泰誠",
+    "group": "渉外局",
+    "image": "profile-pages/page-060.jpg"
+  },
+  {
+    "page": 61,
+    "name": "柘植一我",
+    "group": "渉外局",
+    "image": "profile-pages/page-061.jpg"
+  },
+  {
+    "page": 62,
+    "name": "武田祐来",
+    "group": "渉外局",
+    "image": "profile-pages/page-062.jpg"
+  },
+  {
+    "page": 63,
+    "name": "津崎陽華",
+    "group": "渉外局",
+    "image": "profile-pages/page-063.jpg"
+  },
+  {
+    "page": 64,
+    "name": "立花圭吾",
+    "group": "渉外局",
+    "image": "profile-pages/page-064.jpg"
+  },
+  {
+    "page": 65,
+    "name": "橋本紗希",
+    "group": "渉外局",
+    "image": "profile-pages/page-065.jpg"
+  },
+  {
+    "page": 66,
+    "name": "木村一翔",
+    "group": "渉外局",
+    "image": "profile-pages/page-066.jpg"
+  },
+  {
+    "page": 67,
+    "name": "李康潤",
+    "group": "渉外局",
+    "image": "profile-pages/page-067.jpg"
+  },
+  {
+    "page": 68,
+    "name": "浅本帆美",
+    "group": "渉外局",
+    "image": "profile-pages/page-068.jpg"
+  },
+  {
+    "page": 69,
+    "name": "水田美咲",
+    "group": "渉外局",
+    "image": "profile-pages/page-069.jpg"
+  },
+  {
+    "page": 70,
+    "name": "黒岩賢人",
+    "group": "渉外局",
+    "image": "profile-pages/page-070.jpg"
+  },
+  {
+    "page": 71,
+    "name": "小倉空桜",
+    "group": "渉外局",
+    "image": "profile-pages/page-071.jpg"
+  },
+  {
+    "page": 72,
+    "name": "阿部泰士",
+    "group": "渉外局",
+    "image": "profile-pages/page-072.jpg"
+  },
+  {
+    "page": 73,
+    "name": "中尾果茄",
+    "group": "渉外局",
+    "image": "profile-pages/page-073.jpg"
+  },
+  {
+    "page": 74,
+    "name": "伊藤大翔",
+    "group": "渉外局",
+    "image": "profile-pages/page-074.jpg"
+  },
+  {
+    "page": 75,
+    "name": "石井昊汰",
+    "group": "渉外局",
+    "image": "profile-pages/page-075.jpg"
+  },
+  {
+    "page": 76,
+    "name": "比嘉マリン",
+    "group": "渉外局",
+    "image": "profile-pages/page-076.jpg"
+  },
+  {
+    "page": 77,
+    "name": "安田未羽",
+    "group": "渉外局",
+    "image": "profile-pages/page-077.jpg"
+  },
+  {
+    "page": 78,
+    "name": "田中寧々",
+    "group": "渉外局",
+    "image": "profile-pages/page-078.jpg"
+  },
+  {
+    "page": 79,
+    "name": "西村優希",
+    "group": "渉外局",
+    "image": "profile-pages/page-079.jpg"
+  },
+  {
+    "page": 80,
+    "name": "林直太朗",
+    "group": "渉外局",
+    "image": "profile-pages/page-080.jpg"
+  },
+  {
+    "page": 81,
+    "name": "今川綾音",
+    "group": "渉外局",
+    "image": "profile-pages/page-081.jpg"
+  },
+  {
+    "page": 82,
+    "name": "神山旭志",
+    "group": "渉外局",
+    "image": "profile-pages/page-082.jpg"
+  },
+  {
+    "page": 83,
+    "name": "高口はな乃",
+    "group": "渉外局",
+    "image": "profile-pages/page-083.jpg"
+  },
+  {
+    "page": 84,
+    "name": "小西琉偉",
+    "group": "渉外局",
+    "image": "profile-pages/page-084.jpg"
+  },
+  {
+    "page": 85,
+    "name": "野村悠日",
+    "group": "渉外局",
+    "image": "profile-pages/page-085.jpg"
+  },
+  {
+    "page": 86,
+    "name": "福永真己",
+    "group": "渉外局",
+    "image": "profile-pages/page-086.jpg"
+  },
+  {
+    "page": 87,
+    "name": "樫八重秀太朗",
+    "group": "広報局",
+    "image": "profile-pages/page-087.jpg"
+  },
+  {
+    "page": 88,
+    "name": "岩崎遥",
+    "group": "広報局",
+    "image": "profile-pages/page-088.jpg"
+  },
+  {
+    "page": 89,
+    "name": "宮原羽佳",
+    "group": "広報局",
+    "image": "profile-pages/page-089.jpg"
+  },
+  {
+    "page": 90,
+    "name": "荒井秀美",
+    "group": "広報局",
+    "image": "profile-pages/page-090.jpg"
+  },
+  {
+    "page": 91,
+    "name": "今泉冬和子",
+    "group": "広報局",
+    "image": "profile-pages/page-091.jpg"
+  },
+  {
+    "page": 92,
+    "name": "高山明日香",
+    "group": "広報局",
+    "image": "profile-pages/page-092.jpg"
+  },
+  {
+    "page": 93,
+    "name": "田代怜",
+    "group": "広報局",
+    "image": "profile-pages/page-093.jpg"
+  },
+  {
+    "page": 94,
+    "name": "赤枝湖子",
+    "group": "広報局",
+    "image": "profile-pages/page-094.jpg"
+  },
+  {
+    "page": 95,
+    "name": "金丸創太",
+    "group": "広報局",
+    "image": "profile-pages/page-095.jpg"
+  },
+  {
+    "page": 96,
+    "name": "高野幹太",
+    "group": "広報局",
+    "image": "profile-pages/page-096.jpg"
+  },
+  {
+    "page": 97,
+    "name": "泉谷ゆらら",
+    "group": "広報局",
+    "image": "profile-pages/page-097.jpg"
+  },
+  {
+    "page": 98,
+    "name": "木村笑心",
+    "group": "広報局",
+    "image": "profile-pages/page-098.jpg"
+  },
+  {
+    "page": 99,
+    "name": "藤原志成",
+    "group": "広報局",
+    "image": "profile-pages/page-099.jpg"
+  },
+  {
+    "page": 100,
+    "name": "高田美桜",
+    "group": "広報局",
+    "image": "profile-pages/page-100.jpg"
+  },
+  {
+    "page": 101,
+    "name": "諸留圭輝",
+    "group": "広報局",
+    "image": "profile-pages/page-101.jpg"
+  },
+  {
+    "page": 102,
+    "name": "加藤向晃",
+    "group": "広報局",
+    "image": "profile-pages/page-102.jpg"
+  },
+  {
+    "page": 103,
+    "name": "高橋颯吾",
+    "group": "広報局",
+    "image": "profile-pages/page-103.jpg"
+  },
+  {
+    "page": 104,
+    "name": "下村亮太",
+    "group": "広報局",
+    "image": "profile-pages/page-104.jpg"
+  },
+  {
+    "page": 105,
+    "name": "勝田杏奈",
+    "group": "広報局",
+    "image": "profile-pages/page-105.jpg"
+  },
+  {
+    "page": 106,
+    "name": "金林倫孝",
+    "group": "広報局",
+    "image": "profile-pages/page-106.jpg"
+  },
+  {
+    "page": 107,
+    "name": "藤井百花",
+    "group": "広報局",
+    "image": "profile-pages/page-107.jpg"
+  },
+  {
+    "page": 108,
+    "name": "田中陽菜",
+    "group": "広報局",
+    "image": "profile-pages/page-108.jpg"
+  }
+];
+const home = document.getElementById('home');
+const profile = document.getElementById('profile');
+const namesEl = document.getElementById('names');
+const groupsEl = document.getElementById('groups');
+const filterEl = document.getElementById('filter');
+const countEl = document.getElementById('count');
+const selectedNameEl = document.getElementById('selectedName');
+const selectedGroupEl = document.getElementById('selectedGroup');
+const profileImageEl = document.getElementById('profileImage');
+let activeGroup = 'すべて';
+const groups = ['すべて', ...Array.from(new Set(members.map(m => m.group)))];
+const compact = s => (s || '').normalize('NFKC').replace(/s+/g, '').toLowerCase();
+function routeHome() { history.pushState(null, '', location.pathname); showHome(); }
+function showHome() { home.style.display = 'flex'; profile.classList.remove('active'); document.title = 'StaffBook'; }
+function showProfile(member, push = true) {
+  selectedNameEl.textContent = member.name;
+  selectedGroupEl.textContent = member.group;
+  profileImageEl.src = member.image;
+  profileImageEl.alt = member.name + 'のプロフィール';
+  home.style.display = 'none';
+  profile.classList.add('active');
+  profile.classList.remove('entering');
+  void profile.offsetWidth;
+  profile.classList.add('entering');
+  window.setTimeout(() => profile.classList.remove('entering'), 560);
+  document.title = member.name + ' - StaffBook';
+  if (push) history.pushState({ name: member.name }, '', '#name=' + encodeURIComponent(member.name));
+}
+function renderGroups() {
+  groupsEl.innerHTML = '';
+  for (const group of groups) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'chip' + (group === activeGroup ? ' active' : '');
+    button.textContent = group;
+    button.addEventListener('click', () => { activeGroup = group; renderGroups(); renderNames(); });
+    groupsEl.appendChild(button);
+  }
+}
+function visibleMembers() {
+  const q = compact(filterEl.value);
+  return members.filter(m => (activeGroup === 'すべて' || m.group === activeGroup) && (!q || compact(m.name).includes(q) || compact(m.group).includes(q)));
+}
+function renderNames() {
+  const shown = visibleMembers();
+  countEl.textContent = shown.length + '人';
+  namesEl.innerHTML = '';
+  if (!shown.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = '該当する名前がありません';
+    namesEl.appendChild(empty);
+    return;
+  }
+  for (const member of shown) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'nameButton';
+    button.textContent = member.name;
+    button.addEventListener('click', () => showProfile(member));
+    namesEl.appendChild(button);
+  }
+}
+function applyHash() {
+  const match = location.hash.match(/^#name=(.*)$/);
+  if (!match) { showHome(); return; }
+  const name = decodeURIComponent(match[1]);
+  const member = members.find(m => m.name === name);
+  if (member) showProfile(member, false); else showHome();
+}
+document.getElementById('back').addEventListener('click', routeHome);
+filterEl.addEventListener('input', renderNames);
+window.addEventListener('popstate', applyHash);
+renderGroups();
+renderNames();
+applyHash();
+</script>
+</body>
+</html>
