@@ -713,6 +713,10 @@ const countEl = document.getElementById('count');
 const selectedNameEl = document.getElementById('selectedName');
 const selectedGroupEl = document.getElementById('selectedGroup');
 const profileImageEl = document.getElementById('profileImage');
+profileImageEl.onerror = () => {
+  const src = profileImageEl.getAttribute('src') || '';
+  if (src.startsWith('profile-pages/')) profileImageEl.src = src.replace('profile-pages/', '');
+};
 let activeGroup = 'すべて';
 const groups = ['すべて', ...Array.from(new Set(members.map(m => m.group)))];
 const compact = s => (s || '').normalize('NFKC').replace(/s+/g, '').toLowerCase();
